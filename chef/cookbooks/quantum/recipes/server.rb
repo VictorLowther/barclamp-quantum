@@ -18,7 +18,6 @@ include_recipe "quantum::api_register"
 include_recipe "quantum::common_install"
 
 unless node[:quantum][:use_gitrepo]
-  quantum_service_name="quantum-server"
   pkgs = [ "quantum-server",
            "quantum-l3-agent",
            "quantum-dhcp-agent",
@@ -27,15 +26,14 @@ unless node[:quantum][:use_gitrepo]
   pkgs.each { |p| package p }
   file "/etc/default/quantum-server" do
     action :delete
-    notifies :restart, "service[#{quantum_service_name}]"
+    notifies :restart, "service[quantum-server]"
   end
 else
-  quantum_service_name="quantum-server"
   quantum_path = "/opt/quantum"
   venv_path = node[:quantum][:use_virtualenv] ? "#{quantum_path}/.venv" : nil
   venv_prefix = node[:quantum][:use_virtualenv] ? ". #{venv_path}/bin/activate &&" : nil
 
-  link_service "quantum" do
+  link_service "quantum-server" do
     virtualenv venv_path
     bin_name "quantum-server --config-dir /etc/quantum/"
   end
@@ -50,7 +48,7 @@ else
 end
 
 # Kill all the libvirt default networks.
-bash "Destroy the libvort default network" do
+bash "Destroy the libvirt default network" do
   command "virsh net-destroy default"
   only_if "virsh net-list |grep default"
 end
@@ -166,36 +164,6 @@ directory "/etc/quantum/plugins/openvswitch/" do
    recursive true
 end
 
-unless node[:quantum][:use_gitrepo]
-  link "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" do
-    to "/etc/quantum/quantum.conf"
-  end
-  service quantum_service_name do
-    supports :status => true, :restart => true
-    action :enable
-    subscribes :restart, resources("template[/etc/quantum/api-paste.ini]"), :immediately
-    subscribes :restart, resources("link[/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini]"), :immediately
-    subscribes :restart, resources("template[/etc/quantum/quantum.conf]")
-  end
-else
-  template "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" do
-    source "ovs_quantum_plugin.ini.erb"
-    owner "quantum"
-    group "root"
-    mode "0640"
-    variables(
-        :ovs_sql_connection => node[:quantum][:db][:sql_connection]
-    )
-  end
-  service quantum_service_name do
-    supports :status => true, :restart => true
-    action :enable
-    subscribes :restart, resources("template[/etc/quantum/api-paste.ini]"), :immediately
-    subscribes :restart, resources("template[/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini]"), :immediately
-    subscribes :restart, resources("template[/etc/quantum/quantum.conf]")
-  end
-end
-
 service "quantum-dhcp-agent" do
   supports :status => true, :restart => true
   action :enable
@@ -217,7 +185,13 @@ service "quantum-metadata-agent" do
   subscribes :restart, resources("template[/etc/quantum/metadata_agent.ini]")
 end
 
-
+service "quantum-server" do
+  supports :status => true, :restart => true
+  action :enable
+  subscribes :restart, resources("template[/etc/quantum/quantum.conf]")
+  subscribes :restart, resources("template[/etc/quantum/api-paste.ini]")
+  subscribes :restart, resources("template[/etc/quantum/metadata_agent.ini]")
+end
 
 include_recipe "quantum::post_install_conf"
 
