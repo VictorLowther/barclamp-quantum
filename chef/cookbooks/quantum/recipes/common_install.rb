@@ -230,14 +230,26 @@ end
 vlan_start = node[:network][:networks][:nova_fixed][:vlan]
 vlan_end = vlan_start + 2000
 
-unless quantum[:quantum][:use_gitrepo]
-  link "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" do
-    to "/etc/quantum/quantum.conf"
-    notifies :restart, resources(:service => quantum_agent), :immediately
-    notifies :restart, resources(:service => "openvswitch-switch"), :immediately
-  end
+directory "/etc/quantum/plugins/openvswitch" do
+  recursive true
+  owner "quantum"
 end
 
+template "/etc/quantum/plugins/openvswitch/ovs_quantum_plugin.ini" do
+  cookbook "quantum"
+  source "ovs_quantum_plugin.ini.erb"
+  mode "0644"
+  owner "quantum"
+  variables(:networking_mode => quantum[:quantum][:networking_mode],
+            :ovs_sql_connection => quantum[:quantum][:db][:ovs_sql_connection],
+            :gre_tunnel_id_range => quantum[:quantum][:gre_tunnel_id_range],
+            :vlan_start => vlan_start,
+            :vlan_end => vlan_end,
+            :fixed_ip => node.address("nova_fixed").addr,
+            :rootwrap => node[:quantum][:rootwrap]
+            )
+  notifies :restart, resources(:service => quantum_agent), :immediately
+end
 
 template "/etc/quantum/quantum.conf" do
     cookbook "quantum"
@@ -275,4 +287,3 @@ template "/etc/quantum/quantum.conf" do
     )
     notifies :restart, resources(:service => quantum_agent), :immediately
 end
-

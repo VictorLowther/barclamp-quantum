@@ -31,7 +31,8 @@
       ],
       "debug": true,
       "verbose": true,
-      "networking_mode": "local",
+        "networking_mode": "flat",
+        "gre_tunnel_id_range": "1:1000",
       "use_syslog": false,
       "sql_engine": "mysql",
       "mysql_instance": "none",
@@ -75,7 +76,7 @@
       },
       "elements": {},
       "element_order": [
-         ["quantum-server" ]       		           		     
+         ["quantum-server" ]
       ],
       "config": {
         "environment": "quantum-config-base",
